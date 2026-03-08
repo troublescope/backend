@@ -69,7 +69,7 @@ export class RequestService {
 
   private getBaseHeaders(lang: string, deviceId: string, androidId: string, timestamp: string, signature: string, spoffer: string): any {
     const device = this.getRandomDevice();
-    const isIndo = lang === 'in';
+    const isIndo = lang === 'in' || lang === 'id';
     const tz = isIndo ? "+420" : "-300";
     
     const now = new Date();
