@@ -55,67 +55,103 @@ export class DramaboxService {
         { upsert: true }
       );
     } catch (err) {
-      console.error('Failed to save drama to DB:', err);
+      // console.error('Failed to save drama to DB:', err);
     }
   }
 
-  async getHomeData(lang: string = 'in'): Promise<{ forYou: Drama[], trending: Drama[], newest: Drama[] }> {
-    const [forYouData, trendingData, newestData] = await Promise.all([
-      requestService.request('/drama-box/he001/theater', { homePageStyle: 0, isNeedRank: 1, isNeedNewChannel: 1, type: 0, pageNo: 1, pageSize: 20 }, lang),
-      requestService.request('/drama-box/he001/theater', { newChannelStyle: 1, isNeedRank: 1, pageNo: 1, pageSize: 20, index: 0, channelId: 92 }, lang),
-      requestService.request('/drama-box/he001/theater', { homePageStyle: 0, isNeedRank: 1, isNeedNewChannel: 1, type: 0, pageNo: 1, pageSize: 20 }, lang)
-    ]);
-
-    const parse = (data: any) => {
-      const list: Drama[] = [];
-      data?.data?.columnVoList?.forEach((col: any) => col.bookList?.forEach((b: any) => {
-        const drama = this.toDrama(b);
-        list.push(drama);
-        this.saveDramaToDb(drama);
-      }));
-      data?.data?.bannerList?.forEach((b: any) => {
-        const drama = this.toDrama(b);
-        list.push(drama);
-        this.saveDramaToDb(drama);
-      });
-      return list;
-    };
-
-    return {
-      forYou: parse(forYouData),
-      trending: parse(trendingData),
-      newest: parse(newestData)
-    };
-  }
-
-  async getVip(lang: string = 'in'): Promise<Drama[]> {
-    const data = await requestService.request('/drama-box/he001/theater', { newChannelStyle: 1, isNeedRank: 1, pageNo: 1, pageSize: 20, index: 1, channelId: 205 }, lang);
+  private parseTheaterResponse(data: any): Drama[] {
     const list: Drama[] = [];
     data?.data?.columnVoList?.forEach((col: any) => col.bookList?.forEach((b: any) => {
       const drama = this.toDrama(b);
       list.push(drama);
       this.saveDramaToDb(drama);
     }));
+    data?.data?.bannerList?.forEach((b: any) => {
+      const drama = this.toDrama(b);
+      list.push(drama);
+      this.saveDramaToDb(drama);
+    });
     return list;
   }
 
+  async getForYou(lang: string = 'in', page: number = 1): Promise<Drama[]> {
+    const data = await requestService.request('/drama-box/he001/theater', { 
+      homePageStyle: 0, 
+      isNeedRank: 1, 
+      isNeedNewChannel: 1, 
+      type: 0, 
+      pageNo: page, 
+      pageSize: 20 
+    }, lang);
+    return this.parseTheaterResponse(data);
+  }
+
+  async getTrending(lang: string = 'in', page: number = 1): Promise<Drama[]> {
+    const data = await requestService.request('/drama-box/he001/theater', { 
+      newChannelStyle: 1, 
+      isNeedRank: 1, 
+      pageNo: page, 
+      pageSize: 20, 
+      index: 0, 
+      channelId: 92 
+    }, lang);
+    return this.parseTheaterResponse(data);
+  }
+
+  async getNewest(lang: string = 'in', page: number = 1): Promise<Drama[]> {
+    const data = await requestService.request('/drama-box/he001/theater', { 
+      homePageStyle: 0, 
+      isNeedRank: 1, 
+      isNeedNewChannel: 1, 
+      type: 0, 
+      pageNo: page, 
+      pageSize: 20 
+    }, lang);
+    return this.parseTheaterResponse(data);
+  }
+
+  async getHomeData(lang: string = 'in'): Promise<{ forYou: Drama[], trending: Drama[], newest: Drama[] }> {
+    // Sequential to avoid burst triggers
+    const forYou = await this.getForYou(lang);
+    const trending = await this.getTrending(lang);
+    const newest = await this.getNewest(lang);
+
+    return { forYou, trending, newest };
+  }
+
+  async getVip(lang: string = 'in'): Promise<Drama[]> {
+    const data = await requestService.request('/drama-box/he001/theater', { 
+      newChannelStyle: 1, 
+      isNeedRank: 1, 
+      pageNo: 1, 
+      pageSize: 20, 
+      index: 1, 
+      channelId: 205 
+    }, lang);
+    return this.parseTheaterResponse(data);
+  }
+
   async search(query: string, page: number = 1, lang: string = 'in'): Promise<Drama[]> {
-    const data = await requestService.request('/drama-box/search/search', { searchSource: "搜索按钮", pageNo: page, pageSize: 20, from: "search_sug", keyword: query }, lang);
+    const data = await requestService.request('/drama-box/search/search', { 
+      searchSource: "搜索按钮", 
+      pageNo: page, 
+      pageSize: 20, 
+      from: "search_sug", 
+      keyword: query 
+    }, lang);
     const searchList = data?.data?.searchList || [];
-    const results = searchList
+    return searchList
       .filter((item: any) => item.type === 'book' || item.bookId || item.id)
       .map((b: any) => {
         const drama = this.toDrama(b);
         this.saveDramaToDb(drama);
         return drama;
       });
-    return results;
   }
 
   async getDetail(id: string, lang: string = 'in'): Promise<DramaDetail> {
-    // Check DB first
     const cached = await DramaModel.findOne({ id });
-    if (cached && (Date.now() - cached.last_updated.getTime() < 86400000)) { // 24h freshness
+    if (cached && (Date.now() - cached.last_updated.getTime() < 86400000)) {
       return {
         id: cached.id,
         title: cached.title,
@@ -137,7 +173,6 @@ export class DramaboxService {
       total_episodes: Number(b.chapterCount || 0)
     };
 
-    // Update DB record
     this.saveDramaToDb({
       ...detail,
       chapters: detail.total_episodes,
@@ -246,7 +281,6 @@ export class DramaboxService {
       }
     }
 
-    // FILTER QUALITY FOR FREE USERS
     if (plan === 'free' && streamData) {
       return {
         ...streamData,

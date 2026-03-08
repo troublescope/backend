@@ -4,6 +4,7 @@ import WatchHistory from '../models/WatchHistory';
 import SeriesLimit from '../models/SeriesLimit';
 import { seriesService } from '../services/series.service';
 import { episodeService } from '../services/episode.service';
+import { dramaboxService } from '../services/dramabox.service';
 
 const router = Router();
 
@@ -51,11 +52,42 @@ router.post('/check', authMiddleware, async (req, res) => {
   }
 });
 
+// Individual endpoints to match Go structure
+router.get('/foryou', async (req, res) => {
+  try {
+    const { lang, page } = req.query;
+    const items = await dramaboxService.getForYou(lang as string || 'in', Number(page) || 1);
+    res.json({ success: true, data: items });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/trending', async (req, res) => {
+  try {
+    const { lang, page } = req.query;
+    const items = await dramaboxService.getTrending(lang as string || 'in', Number(page) || 1);
+    res.json({ success: true, data: items });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/newest', async (req, res) => {
+  try {
+    const { lang, page } = req.query;
+    const items = await dramaboxService.getNewest(lang as string || 'in', Number(page) || 1);
+    res.json({ success: true, data: items });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Reflect go-v2 API
 router.get('/home', async (req, res) => {
   try {
     const { lang } = req.query;
-    const data = await seriesService.getHomeData(lang as string || 'in');
+    const data = await dramaboxService.getHomeData(lang as string || 'in');
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -65,7 +97,7 @@ router.get('/home', async (req, res) => {
 router.get('/vip', async (req, res) => {
   try {
     const { lang } = req.query;
-    const data = await seriesService.getVip(lang as string || 'in');
+    const data = await dramaboxService.getVip(lang as string || 'in');
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -76,7 +108,7 @@ router.get('/search', async (req, res) => {
   try {
     const { q, page, lang } = req.query;
     if (!q) return res.status(400).json({ error: 'Query required' });
-    const data = await seriesService.searchSeries(q as string, Number(page) || 1, lang as string || 'in');
+    const data = await dramaboxService.search(q as string, Number(page) || 1, lang as string || 'in');
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -87,7 +119,7 @@ router.get('/detail/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { lang } = req.query;
-    const data = await seriesService.getSeriesDetail(id, lang as string || 'in');
+    const data = await dramaboxService.getDetail(id, lang as string || 'in');
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -98,7 +130,7 @@ router.get('/episodes/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { lang } = req.query;
-    const data = await episodeService.getEpisodeList(id, lang as string || 'in');
+    const data = await dramaboxService.getEpisodes(id, lang as string || 'in');
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -118,18 +150,11 @@ router.get('/stream/:id/:episode', authMiddleware, async (req, res) => {
       
       if (!limit) {
         // Fetch real total episodes to calculate probability-based limit
-        const detail = await seriesService.getSeriesDetail(id, lang as string || 'in');
+        const detail = await dramaboxService.getDetail(id, lang as string || 'in');
         const total = detail.total_episodes || 100;
         
-        /**
-         * PROBABILITY LOGIC:
-         * Free limit is randomized between 10% and 25% of total episodes.
-         * Clamped between minimum 5 and maximum 30 episodes.
-         */
         const factor = Math.random() * (0.25 - 0.10) + 0.10;
         let calculatedLimit = Math.floor(total * factor);
-        
-        // Clamp values
         const free_limit = Math.max(5, Math.min(30, calculatedLimit));
 
         limit = new SeriesLimit({ 
@@ -151,7 +176,7 @@ router.get('/stream/:id/:episode', authMiddleware, async (req, res) => {
     }
 
     // 2. Fetch stream with plan-based quality filtering
-    const data = await episodeService.getStream(id, epNum, lang as string || 'in', user.plan);
+    const data = await dramaboxService.getStream(id, epNum, lang as string || 'in', user.plan);
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
