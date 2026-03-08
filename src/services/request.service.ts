@@ -1,4 +1,8 @@
 import crypto from 'crypto';
+import zlib from 'zlib';
+import { promisify } from 'util';
+
+const gunzip = promisify(zlib.gunzip);
 
 export interface TokenData {
   token: string;
@@ -43,6 +47,7 @@ export class RequestService {
   private baseUrl = 'https://sapi.dramaboxdb.com';
   private cache = new MemoryCache();
   private timeout = 30000;
+  private tokenPromise: Map<string, Promise<TokenData>> = new Map();
 
   private getPrivateKey(): crypto.KeyObject {
     const b64 = "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC9Q4Y5QX5j08HrnbY3irfKdkEllAU2OORnAjlXDyCzcm2Z6ZRrGvtTZUAMelfU5PWS6XGEm3d4kJEKbXi4Crl8o2E/E3YJPk1lQD1d0JTdrvZleETN1ViHZFSQwS3L94Woh0E3TPebaEYq88eExvKu1tDdjSoFjBbgMezySnas5Nc2xF28XhPuC8m15u+dectsrJl+ALGcTDX3Lv3FURuwV/dN7WMEkgcseIKVMdJxzUB0PeSqCNftfxmdBV/U4yXFRxPhnSFSXCrkj6uJjickiYq1pQ1aZfrQe1eLD3MB2hKq7crhMcA3kpggQlnmy1wRR4BAttmSU4fPb/yF8D3hAgMBAAECggEBAJdru6p5RLZ3h/GLF2rud8bqv4piF51e/RWQyPFnMAGBrkByiYT7bFI3cnvJMhYpLHRigqjWfUofV3thRDDym54lVLtTRZ91khRMxgwVwdRuk8Fw7JNFenOwCJxbgdlq6iuAMuQclwll7qWUrm8DgMvzH93xf8o6X171cp4Sh0og1Ra7E9GZ37dzBlX2aJBK8VBfctZntuDPx52e71nafqfbjXxZuEtpu92oJd6A9mWbd0BZTk72ZHUmDcKcqjfcEH19SWOphMJFYkxU5FRoIEr3/zisyTO4Mt33ZmwELOrY9PdlyAAyed7ZoH+hlTr7c025QROvb2LmqgRiUT56tMECgYEA+jH5m6iMRK6XjiBhSUnlr3DzRybwlQrtIj5sZprWe2my5uYHG3jbViYIO7GtQvMTnDrBCxNhuM6dPrL0cRnbsp/iBMXe3pyjT/aWveBkn4R+UpBsnbtDn28r1MZpCDtr5UNc0TPj4KFJvjnV/e8oGoyYEroECqcw1LqNOGDiLhkCgYEAwaemNePYrXW+MVX/hatfLQ96tpxwf7yuHdENZ2q5AFw73GJWYvC8VY+TcoKPAmeoCUMltI3TrS6K5Q/GoLd5K2BsoJrSxQNQFd3ehWAtdOuPDvQ5rn/2fsvgvc3rOvJh7uNnwEZCI/45WQg+UFWref4PPc+ArNtp9Xj2y7LndwkCgYARojIQeXmhYZjG6JtSugWZLuHGkwUDzChYcIPdW25ndluokG/RzNvQn4+W/XfTryQjr7RpXm1VxCIrCBvYWNU2KrSYV4XUtL+B5ERNj6In6AOrOAifuVITy5cQQQeoD+AT4YKKMBkQfO2gnZzqb8+ox130e+3K/mufoqJPZeyrCQKBgC2fobjwhQvYwYY+DIUharri+rYrBRYTDbJYnh/PNOaw1CmHwXJt5PEDcml3+NlIMn58I1X2U/hpDrAIl3MlxpZBkVYFI8LmlOeR7ereTddN59ZOE4jY/OnCfqA480Jf+FKfoMHby5lPO5OOLaAfjtae1FhrmpUe3EfIx9wVuhKBAoGBAPFzHKQZbGhkqmyPW2ctTEIWLdUHyO37fm8dj1WjN4wjRAI4ohNiKQJRh3QE11E1PzBTl9lZVWT8QtEsSjnrA/tpGr378fcUT7WGBgTmBRaAnv1P1n/Tp0TSvh5XpIhhMuxcitIgrhYMIG3GbP9JNAarxO/qPW6Gi0xWaF7il7Or";
@@ -69,7 +74,7 @@ export class RequestService {
     const localTimeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${tz}`;
 
     return {
-      "Accept-Encoding": "identity",
+      "Accept-Encoding": "gzip",
       "Connection": "Keep-Alive",
       "Content-Type": "application/json; charset=UTF-8",
       "version": "542",
@@ -109,50 +114,75 @@ export class RequestService {
   }
 
   async generateToken(lang: string = 'in'): Promise<TokenData> {
-    const timestamp = Date.now().toString();
-    const deviceId = crypto.randomUUID();
-    const androidId = crypto.randomBytes(8).toString('hex');
-    const spoffer = Array.from({length: 4}, () => Math.floor(Math.random() * 256)).join('.');
+    // Promise lock to prevent multiple simultaneous boots
+    const existingPromise = this.tokenPromise.get(lang);
+    if (existingPromise) return existingPromise;
 
-    const payload = { distinctId: androidId, scene: null };
-    const body = JSON.stringify(payload);
-    const signData = `timestamp=${timestamp}${body}${deviceId}${androidId}`;
-    const signature = this.sign(signData);
+    const promise = (async () => {
+      const timestamp = Date.now().toString();
+      const deviceId = crypto.randomUUID();
+      const androidId = crypto.randomBytes(8).toString('hex');
+      const spoffer = Array.from({length: 4}, () => Math.floor(Math.random() * 256)).join('.');
 
-    const headers = this.getBaseHeaders(lang, deviceId, androidId, timestamp, signature, spoffer);
-    const url = `${this.baseUrl}/drama-box/ap001/bootstrap?timestamp=${timestamp}`;
+      const payload = { distinctId: androidId, scene: null };
+      const body = JSON.stringify(payload);
+      const signData = `timestamp=${timestamp}${body}${deviceId}${androidId}`;
+      const signature = this.sign(signData);
 
-    let lastErr: any;
-    for (let i = 0; i < 3; i++) {
-      if (i > 0) {
-        await new Promise(r => setTimeout(r, i * 1000 + Math.random() * 200));
+      const headers = this.getBaseHeaders(lang, deviceId, androidId, timestamp, signature, spoffer);
+      const url = `${this.baseUrl}/drama-box/ap001/bootstrap?timestamp=${timestamp}`;
+
+      let lastErr: any;
+      for (let i = 0; i < 3; i++) {
+        if (i > 0) {
+          await new Promise(r => setTimeout(r, i * 1000 + Math.random() * 200));
+        }
+        try {
+          const response = await fetch(url, { method: 'POST', headers, body });
+          
+          let buffer = await response.arrayBuffer();
+          let text: string;
+          if (response.headers.get('content-encoding') === 'gzip') {
+            try {
+              const decompressed = await gunzip(Buffer.from(buffer));
+              text = decompressed.toString();
+            } catch (e) {
+              text = Buffer.from(buffer).toString();
+            }
+          } else {
+            text = Buffer.from(buffer).toString();
+          }
+
+          const result = JSON.parse(text) as any;
+          const user = result?.data?.user;
+          if (!user) throw new Error('Bootstrap failed');
+
+          const tokenData: TokenData = {
+            token: user.token,
+            deviceId,
+            androidId,
+            spoffer,
+            uuid: user.uid.toString(),
+            timestamp: Date.now(),
+            expiry: Date.now() + 12 * 60 * 60 * 1000
+          };
+
+          this.cache.set(`token_v2_${lang}`, tokenData, 3600 * 11);
+          return tokenData;
+        } catch (err: any) {
+          lastErr = err;
+          if (i < 2) continue;
+        }
       }
-      try {
-        const response = await fetch(url, { method: 'POST', headers, body });
-        const text = await response.text();
+      throw lastErr;
+    })();
 
-        const result = JSON.parse(text) as any;
-        const user = result?.data?.user;
-        if (!user) throw new Error('Bootstrap failed');
-
-        const tokenData: TokenData = {
-          token: user.token,
-          deviceId,
-          androidId,
-          spoffer,
-          uuid: user.uid.toString(),
-          timestamp: Date.now(),
-          expiry: Date.now() + 12 * 60 * 60 * 1000
-        };
-
-        this.cache.set(`token_v2_${lang}`, tokenData, 3600 * 11);
-        return tokenData;
-      } catch (err: any) {
-        lastErr = err;
-        if (i < 2) continue;
-      }
+    this.tokenPromise.set(lang, promise);
+    try {
+      return await promise;
+    } finally {
+      this.tokenPromise.delete(lang);
     }
-    throw lastErr;
   }
 
   async request(endpoint: string, payload: any = {}, lang: string = 'in'): Promise<any> {
@@ -181,7 +211,20 @@ export class RequestService {
       try {
         const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
         clearTimeout(id);
-        const text = await response.text();
+        
+        let buffer = await response.arrayBuffer();
+        let text: string;
+
+        if (response.headers.get('content-encoding') === 'gzip') {
+          try {
+            const decompressed = await gunzip(Buffer.from(buffer));
+            text = decompressed.toString();
+          } catch (e) {
+            text = Buffer.from(buffer).toString();
+          }
+        } else {
+          text = Buffer.from(buffer).toString();
+        }
 
         try {
           const parsed = JSON.parse(text);
