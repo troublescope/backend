@@ -1,0 +1,85 @@
+{
+  "project": "tmaback",
+  "modules": ["Dramabox Integration", "Telegram Bot", "Authentication", "User Statistics", "Favorites", "Subscriptions"],
+  "infrastructure": {
+    "database": "MongoDB",
+    "cache": "Upstash Redis (REST)",
+    "bot_framework": "grammy",
+    "auth_type": "JWT + Telegram Mini App InitData"
+  },
+  "endpoints": [
+    {
+      "path": "/auth/telegram",
+      "method": "POST",
+      "description": "Exchange Telegram Mini App initDataRaw for JWT",
+      "body": ["initDataRaw"]
+    },
+    {
+      "path": "/users/me",
+      "method": "GET",
+      "auth": true,
+      "description": "Get current user profile and subscription"
+    },
+    {
+      "path": "/users/stats",
+      "method": "GET",
+      "auth": true,
+      "description": "Get watch statistics and Continue Watching list"
+    },
+    {
+      "path": "/favorites/toggle",
+      "method": "POST",
+      "auth": true,
+      "description": "Add or remove a series from favorites",
+      "body": ["series_id"]
+    },
+    {
+      "path": "/favorites",
+      "method": "GET",
+      "auth": true,
+      "description": "Get all favorited series with metadata"
+    },
+    {
+      "path": "/subscription/upgrade",
+      "method": "POST",
+      "auth": true,
+      "description": "Upgrade user to VIP plan",
+      "body": ["plan_type (weekly, monthly, yearly)"]
+    },
+    {
+      "path": "/watch/home",
+      "method": "GET",
+      "description": "Fetch homepage sections",
+      "query": ["lang"]
+    },
+    {
+      "path": "/watch/stream/:id/:episode",
+      "method": "GET",
+      "auth": true,
+      "description": "Fetch streaming links with Unlock Bypass and Quality/Episode capping",
+      "params": ["id", "episode"],
+      "logic": {
+        "free_limits": {
+          "episode_cap": "10-25% of total (clamped 5-30)",
+          "quality_lock": ["1080p"]
+        }
+      }
+    }
+  ],
+  "telegram_bot": {
+    "commands": [
+      {
+        "command": "/start",
+        "payload": "series_id (optional)",
+        "description": "Launch Mini App. Supports startapp payload for deep linking."
+      }
+    ],
+    "features": [
+      {
+        "type": "inline_query",
+        "description": "Global search for dramas with rich HTML cards and deep-linked play buttons.",
+        "cache_time": 300
+      }
+    ]
+  }
+}
