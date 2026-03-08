@@ -1,15 +1,16 @@
-# tmaback - API & System Documentation
+# 📺 tmaback - API & System Documentation
 
-This documentation covers the Dramabox integration, Telegram Bot, Authentication, and User Management systems.
+This documentation covers the Dramabox integration, Telegram Bot, Authentication, User Management, and Payment systems.
 
-## Base URL
-`http://<host>:<port>`
+## 🔗 Live URLs
+- **Production API:** `https://dramabackend.vercel.app`
+- **Interactive Docs (Swagger):** `https://dramabackend.vercel.app/docs/`
 
 ---
 
 ## 🤖 Telegram Bot Integration
 
-The system includes a Telegram Bot built with `grammy`.
+The system includes a Telegram Bot built with the `grammY` framework.
 
 #### 1. Start & Deep Linking
 - **Command:** `/start`
@@ -40,7 +41,7 @@ Exchange Telegram `initDataRaw` for a JWT token.
 - **URL:** `/auth/telegram`
 - **Method:** `POST`
 - **Body:** `{ "initDataRaw": "string" }`
-- **Process:** Validates data, checks for blocked users, creates/updates user, and issues a 7-day JWT.
+- **Process:** Validates HMAC signature using bot token, checks for blocked users, creates/updates user, and issues a 7-day JWT.
 
 ---
 
@@ -84,7 +85,7 @@ Exchange Telegram `initDataRaw` for a JWT token.
 
 ---
 
-## 💳 Subscription API
+## 💳 Subscription & Payments API
 
 #### 1. Upgrade to VIP
 - **URL:** `/subscription/upgrade`
@@ -93,24 +94,45 @@ Exchange Telegram `initDataRaw` for a JWT token.
 - **Body:** `{ "plan_type": "weekly" | "monthly" | "yearly" }`
 - **Action:** Grants VIP access for 7, 30, or 365 days.
 
-#### 2. Auto-Expiration
+#### 2. Create Payment
+- **URL:** `/payments/create`
+- **Method:** `POST`
+- **Auth:** Required
+- **Body:** `{ "amount": number, "currency": "USD", "provider": "string" }`
+- **Returns:** Created payment record.
+
+#### 3. Payment History
+- **URL:** `/payments`
+- **Method:** `GET`
+- **Auth:** Required
+- **Returns:** List of user's payment records.
+
+#### 4. Auto-Expiration
 - **Logic:** `authMiddleware` automatically checks `expires_at` on every request. If expired, the user is downgraded to `free` plan instantly.
 
 ---
 
 ## 📺 Dramabox (Watch) API
 
-Reflected from `go-v2` reference with randomized device profiles and Indonesian default.
+Reflected from `go-v2` reference with randomized device profiles, security headers, and GZIP support.
 
 ### Base Path: `/watch`
 
 #### 1. Home Data (`/home`)
 Retrieves categorized series (For You, Trending, Newest).
+- **Query Params:** `lang` (default: `in`)
 
-#### 2. VIP Series (`/vip`)
-Retrieves specialized VIP/Members-only content.
+#### 2. Search (`/search`)
+Search for series by title.
+- **Query Params:** `q` (query string), `page`, `lang`
 
-#### 3. Stream Link (`/stream/:id/:episode`) **[AUTH REQUIRED]**
+#### 3. Series Detail (`/detail/:id`)
+Get full metadata for a specific drama.
+
+#### 4. Episode List (`/episodes/:id`)
+Get the list of all episodes for a drama.
+
+#### 5. Stream Link (`/stream/:id/:episode`) **[AUTH REQUIRED]**
 - **Features:** 
   - **Official Unlock Bypass:** Server-side unlock for VIP episodes.
   - **Free Limits:** Probability-based lock (10-25% of total eps, clamped 5-30).
@@ -121,6 +143,11 @@ Retrieves specialized VIP/Members-only content.
 
 ## ⚙️ Infrastructure
 
-- **MongoDB**: Persistent storage for Profiles, Metadata, History, and Favorites.
-- **Redis (Upstash)**: 1-hour cache for dynamic stream links.
-- **User-Agent Rotation**: Every request uses a randomized Android device profile (Pixel, Samsung, etc.).
+- **Framework:** Express (Node.js) with TypeScript.
+- **Database:** MongoDB Atlas (Profiles, Metadata, History, Favorites).
+- **Cache:** Upstash Redis (1-hour cache for dynamic stream links).
+- **Security:** 
+  - **RSA-SHA256 Signing:** All upstream requests are signed.
+  - **GZIP Support:** Robust decompression for upstream responses.
+  - **User-Agent Rotation:** Randomized Android device profiles (Pixel, Samsung, etc.).
+  - **Rate Limiting:** Protects Auth and API endpoints.

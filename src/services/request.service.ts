@@ -137,12 +137,15 @@ export class RequestService {
         let buffer = await response.arrayBuffer();
         let text: string;
         if (response.headers.get('content-encoding') === 'gzip') {
-          const decompressed = await gunzip(Buffer.from(buffer));
-          text = decompressed.toString();
+          try {
+            const decompressed = await gunzip(Buffer.from(buffer));
+            text = decompressed.toString();
+          } catch (e) {
+            text = Buffer.from(buffer).toString();
+          }
         } else {
           text = Buffer.from(buffer).toString();
         }
-
         const result = JSON.parse(text) as any;
         const user = result?.data?.user;
         if (!user) throw new Error('Bootstrap failed');
@@ -198,12 +201,15 @@ export class RequestService {
         let text: string;
 
         if (response.headers.get('content-encoding') === 'gzip') {
-          const decompressed = await gunzip(Buffer.from(buffer));
-          text = decompressed.toString();
+          try {
+            const decompressed = await gunzip(Buffer.from(buffer));
+            text = decompressed.toString();
+          } catch (e) {
+            text = Buffer.from(buffer).toString();
+          }
         } else {
           text = Buffer.from(buffer).toString();
         }
-
         try {
           const parsed = JSON.parse(text);
           if (response.status >= 500 && i < 2) throw new Error('Upstream 500');

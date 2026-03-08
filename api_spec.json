@@ -1,11 +1,21 @@
 {
   "project": "tmaback",
-  "modules": ["Dramabox Integration", "Telegram Bot", "Authentication", "User Statistics", "Favorites", "Subscriptions"],
+  "version": "1.0.0",
+  "docs_url": "https://dramabackend.vercel.app/docs/",
+  "modules": [
+    "Dramabox Integration (go-v2 logic)",
+    "Telegram Bot (grammY)",
+    "Authentication (TMA InitData + JWT)",
+    "User Statistics & History",
+    "Favorites & Metadata",
+    "Subscriptions & Payments"
+  ],
   "infrastructure": {
-    "database": "MongoDB",
-    "cache": "Upstash Redis (REST)",
-    "bot_framework": "grammy",
-    "auth_type": "JWT + Telegram Mini App InitData"
+    "runtime": "Node.js (TypeScript)",
+    "framework": "Express",
+    "database": "MongoDB Atlas",
+    "cache": "Upstash Redis",
+    "security": "RSA-SHA256 Signing + GZIP support"
   },
   "endpoints": [
     {
@@ -47,10 +57,22 @@
       "body": ["plan_type (weekly, monthly, yearly)"]
     },
     {
+      "path": "/payments/create",
+      "method": "POST",
+      "auth": true,
+      "description": "Create a new payment record"
+    },
+    {
       "path": "/watch/home",
       "method": "GET",
-      "description": "Fetch homepage sections",
+      "description": "Fetch categorized homepage sections",
       "query": ["lang"]
+    },
+    {
+      "path": "/watch/search",
+      "method": "GET",
+      "description": "Search for dramas",
+      "query": ["q", "page", "lang"]
     },
     {
       "path": "/watch/stream/:id/:episode",
