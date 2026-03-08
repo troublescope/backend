@@ -12,6 +12,7 @@ export interface Drama {
   playCount: string;
   tags: string[];
   rank?: string;
+  episode_1_url?: string;
 }
 
 export interface DramaDetail {

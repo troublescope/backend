@@ -55,8 +55,21 @@ router.post('/check', authMiddleware, async (req, res) => {
 // Individual endpoints to match Go structure
 router.get('/foryou', async (req, res) => {
   try {
-    const { lang, page } = req.query;
+    const { lang, page, video } = req.query;
     const items = await dramaboxService.getForYou(lang as string || 'in', Number(page) || 1);
+    
+    // If video=true, fetch stream URL for the first 5 items
+    if (video === 'true') {
+      for (let i = 0; i < Math.min(items.length, 5); i++) {
+        try {
+          const stream = await dramaboxService.getStream(items[i].id, 1, lang as string || 'in', 'free');
+          items[i].episode_1_url = stream.streams[0]?.url;
+        } catch (e) {
+          // Skip if stream fetch fails
+        }
+      }
+    }
+
     res.json({ success: true, data: items });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
