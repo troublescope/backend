@@ -46,7 +46,6 @@ class MemoryCache {
 export class RequestService {
   private baseUrl = 'https://sapi.dramaboxdb.com';
   private cache = new MemoryCache();
-  private tokenCache: TokenData | null = null;
   private timeout = 30000;
 
   private getPrivateKey(): crypto.KeyObject {
@@ -90,15 +89,21 @@ export class RequestService {
       "pline": "ANDROID",
       "country-code": isIndo ? "ID" : "US",
       "Accept-Language": isIndo ? "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7" : "en-US,en;q=0.9",
+      "mchid": "DLLPF1117102",
+      "mbid": "42000004952",
       "tz": tz,
       "mcc": isIndo ? "510" : "310",
       "locale": isIndo ? "id_ID" : "en_US",
       "time-zone": tz,
+      "is_root": "0",
+      "nchid": "DRA1000042",
+      "instanceid": "8509b2bf5177e9468d4b54b2a8e3e676",
       "md": device.model,
       "mf": device.brand,
       "brand": device.brand,
       "ov": device.osVersion,
       "User-Agent": device.userAgent,
+      "srn": "1080x2400",
     };
   }
 
