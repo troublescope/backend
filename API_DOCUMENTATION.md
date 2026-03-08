@@ -122,17 +122,21 @@ Reflected from `go-v2` reference with randomized device profiles, security heade
 Retrieves categorized series (For You, Trending, Newest).
 - **Query Params:** `lang` (default: `in`)
 
-#### 2. Search (`/search`)
+#### 2. For You (`/foryou`)
+Retrieves specialized recommendations.
+- **Query Params:** `lang`, `page`, `video` (Set `video=true` to include `episode_1_url` for the first 5 items).
+
+#### 3. Search (`/search`)
 Search for series by title.
 - **Query Params:** `q` (query string), `page`, `lang`
 
-#### 3. Series Detail (`/detail/:id`)
+#### 4. Series Detail (`/detail/:id`)
 Get full metadata for a specific drama.
 
-#### 4. Episode List (`/episodes/:id`)
+#### 5. Episode List (`/episodes/:id`)
 Get the list of all episodes for a drama.
 
-#### 5. Stream Link (`/stream/:id/:episode`) **[AUTH REQUIRED]**
+#### 6. Stream Link (`/stream/:id/:episode`) **[AUTH REQUIRED]**
 - **Features:** 
   - **Official Unlock Bypass:** Server-side unlock for VIP episodes.
   - **Free Limits:** Probability-based lock (10-25% of total eps, clamped 5-30).
@@ -148,6 +152,6 @@ Get the list of all episodes for a drama.
 - **Cache:** Upstash Redis (1-hour cache for dynamic stream links).
 - **Security:** 
   - **RSA-SHA256 Signing:** All upstream requests are signed.
-  - **GZIP Support:** Robust decompression for upstream responses.
+  - **Axios:** Used for consistent TLS fingerprinting to bypass upstream blocks.
   - **User-Agent Rotation:** Randomized Android device profiles (Pixel, Samsung, etc.).
   - **Rate Limiting:** Protects Auth and API endpoints.

@@ -53,6 +53,20 @@ export const swaggerSpec = {
           created_at: { type: 'string', format: 'date-time' },
         },
       },
+      Drama: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          cover: { type: 'string' },
+          chapters: { type: 'number' },
+          description: { type: 'string' },
+          playCount: { type: 'string' },
+          tags: { type: 'array', items: { type: 'string' } },
+          rank: { type: 'string' },
+          episode_1_url: { type: 'string', description: 'Direct URL to episode 1 video (if requested with video=true)' },
+        },
+      },
       WatchHistory: {
         type: 'object',
         properties: {
@@ -100,6 +114,7 @@ export const swaggerSpec = {
                   properties: {
                     status: { type: 'string' },
                     region: { type: 'string' },
+                    node_env: { type: 'string' },
                   },
                 },
               },
@@ -332,6 +347,57 @@ export const swaggerSpec = {
         },
       },
     },
+    '/watch/foryou': {
+      get: {
+        summary: 'Get For You recommendations',
+        tags: ['Watch'],
+        parameters: [
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } },
+          { name: 'page', in: 'query', schema: { type: 'number', default: 1 } },
+          { name: 'video', in: 'query', schema: { type: 'boolean', default: false }, description: 'Include episode_1_url for top 5 items' }
+        ],
+        responses: {
+          200: { 
+            description: 'List of dramas',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: { type: 'array', items: { $ref: '#/components/schemas/Drama' } }
+                  }
+                }
+              }
+            }
+          },
+        },
+      },
+    },
+    '/watch/trending': {
+      get: {
+        summary: 'Get trending dramas',
+        tags: ['Watch'],
+        parameters: [
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
+        ],
+        responses: {
+          200: { description: 'List of dramas' },
+        },
+      },
+    },
+    '/watch/newest': {
+      get: {
+        summary: 'Get newest dramas',
+        tags: ['Watch'],
+        parameters: [
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
+        ],
+        responses: {
+          200: { description: 'List of dramas' },
+        },
+      },
+    },
     '/watch/vip': {
       get: {
         summary: 'Get VIP content',
@@ -354,7 +420,14 @@ export const swaggerSpec = {
           { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
         ],
         responses: {
-          200: { description: 'Search results' },
+          200: { 
+            description: 'Search results',
+            content: {
+              'application/json': {
+                schema: { type: 'array', items: { $ref: '#/components/schemas/Drama' } }
+              }
+            }
+          },
         },
       },
     },
@@ -494,7 +567,7 @@ export const swaggerSpec = {
         },
       },
       post: {
-        summary: 'Add to favorites',
+        summary: 'Toggle favorite',
         tags: ['Favorites'],
         security: [{ bearerAuth: [] }],
         requestBody: {
@@ -504,14 +577,26 @@ export const swaggerSpec = {
               schema: {
                 type: 'object',
                 properties: {
-                  content_id: { type: 'string' },
+                  series_id: { type: 'string' },
                 },
               },
             },
           },
         },
         responses: {
-          201: { description: 'Added to favorites' },
+          200: { 
+            description: 'Toggle status',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    favorited: { type: 'boolean' }
+                  }
+                }
+              }
+            }
+          },
         },
       },
     },

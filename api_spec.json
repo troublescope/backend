@@ -1,7 +1,7 @@
 {
   "project": "tmaback",
   "version": "1.0.0",
-  "docs_url": "https://dramabackend.vercel.app/docs/",
+  "docs_url": "https://tmaback.vercel.app/docs/",
   "modules": [
     "Dramabox Integration (go-v2 logic)",
     "Telegram Bot (grammY)",
@@ -15,7 +15,7 @@
     "framework": "Express",
     "database": "MongoDB Atlas",
     "cache": "Upstash Redis",
-    "security": "RSA-SHA256 Signing + GZIP support"
+    "security": "RSA-SHA256 Signing + Axios TLS + GZIP support"
   },
   "endpoints": [
     {
@@ -67,6 +67,12 @@
       "method": "GET",
       "description": "Fetch categorized homepage sections",
       "query": ["lang"]
+    },
+    {
+      "path": "/watch/foryou",
+      "method": "GET",
+      "description": "Fetch specialized recommendations",
+      "query": ["lang", "page", "video (optional true/false)"]
     },
     {
       "path": "/watch/search",
