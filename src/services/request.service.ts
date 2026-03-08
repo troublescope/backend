@@ -152,8 +152,14 @@ export class RequestService {
     try {
       const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
       clearTimeout(id);
-      return await response.json();
-    } catch (err) {
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error(`JSON Parse Error from ${endpoint}. Status: ${response.status}. Body snippet: ${text.substring(0, 500)}`);
+        throw new Error(`Invalid JSON response from upstream (Status ${response.status})`);
+      }
+    } catch (err: any) {
       clearTimeout(id);
       throw err;
     }
