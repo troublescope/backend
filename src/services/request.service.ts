@@ -1,4 +1,8 @@
 import crypto from 'crypto';
+import zlib from 'zlib';
+import { promisify } from 'util';
+
+const gunzip = promisify(zlib.gunzip);
 
 export interface TokenData {
   token: string;
@@ -112,23 +116,38 @@ export class RequestService {
     const headers = this.getBaseHeaders(lang, deviceId, androidId, timestamp, signature, spoffer);
     const url = `${this.baseUrl}/drama-box/ap001/bootstrap?timestamp=${timestamp}`;
 
-    const response = await fetch(url, { method: 'POST', headers, body });
-    const result = await response.json() as any;
-    const user = result?.data?.user;
-    if (!user) throw new Error('Bootstrap failed');
+    try {
+      const response = await fetch(url, { method: 'POST', headers, body });
+      
+      let buffer = await response.arrayBuffer();
+      let text: string;
+      if (response.headers.get('content-encoding') === 'gzip') {
+        const decompressed = await gunzip(Buffer.from(buffer));
+        text = decompressed.toString();
+      } else {
+        text = Buffer.from(buffer).toString();
+      }
 
-    const tokenData: TokenData = {
-      token: user.token,
-      deviceId,
-      androidId,
-      spoffer,
-      uuid: user.uid.toString(),
-      timestamp: Date.now(),
-      expiry: Date.now() + 12 * 60 * 60 * 1000
-    };
+      const result = JSON.parse(text) as any;
+      const user = result?.data?.user;
+      if (!user) throw new Error('Bootstrap failed');
 
-    this.cache.set(`token_v2_${lang}`, tokenData, 3600 * 11);
-    return tokenData;
+      const tokenData: TokenData = {
+        token: user.token,
+        deviceId,
+        androidId,
+        spoffer,
+        uuid: user.uid.toString(),
+        timestamp: Date.now(),
+        expiry: Date.now() + 12 * 60 * 60 * 1000
+      };
+
+      this.cache.set(`token_v2_${lang}`, tokenData, 3600 * 11);
+      return tokenData;
+    } catch (err: any) {
+      console.error('Token generation failed:', err.message);
+      throw err;
+    }
   }
 
   async request(endpoint: string, payload: any = {}, lang: string = 'in'): Promise<any> {
@@ -152,7 +171,17 @@ export class RequestService {
     try {
       const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
       clearTimeout(id);
-      const text = await response.text();
+      
+      let buffer = await response.arrayBuffer();
+      let text: string;
+
+      if (response.headers.get('content-encoding') === 'gzip') {
+        const decompressed = await gunzip(Buffer.from(buffer));
+        text = decompressed.toString();
+      } else {
+        text = Buffer.from(buffer).toString();
+      }
+
       try {
         return JSON.parse(text);
       } catch (e) {
