@@ -50,7 +50,11 @@ app.use('/payments', paymentRoutes);
 app.use('/config', configRoutes);
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', region: 'sin1' });
+  res.json({ 
+    status: 'ok', 
+    region: process.env.VERCEL_REGION || 'unknown',
+    node_env: process.env.NODE_ENV
+  });
 });
 
 app.get('/', (req, res) => {
