@@ -10,6 +10,10 @@ export const swaggerSpec = {
       url: 'http://localhost:3000',
       description: 'Local server',
     },
+    {
+      url: 'https://tmaback.vercel.app',
+      description: 'Production server (Vercel)',
+    },
   ],
   components: {
     securitySchemes: {
@@ -34,15 +38,80 @@ export const swaggerSpec = {
       Subscription: {
         type: 'object',
         properties: {
+          user_id: { type: 'string' },
           plan: { type: 'string', enum: ['free', 'vip'] },
           status: { type: 'string', enum: ['active', 'inactive', 'expired'] },
           started_at: { type: 'string', format: 'date-time' },
           expires_at: { type: 'string', format: 'date-time' },
         },
       },
+      Payment: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          user_id: { type: 'string' },
+          amount: { type: 'number' },
+          currency: { type: 'string' },
+          status: { type: 'string', enum: ['pending', 'completed', 'failed'] },
+          provider: { type: 'string' },
+          created_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      WatchHistory: {
+        type: 'object',
+        properties: {
+          series_id: { type: 'string' },
+          episode: { type: 'number' },
+          progress: { type: 'number' },
+          watched_at: { type: 'string', format: 'date-time' },
+        },
+      },
     },
   },
   paths: {
+    '/': {
+      get: {
+        summary: 'Root check',
+        tags: ['System'],
+        responses: {
+          200: {
+            description: 'Status check',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/health': {
+      get: {
+        summary: 'Health check',
+        tags: ['System'],
+        responses: {
+          200: {
+            description: 'Health status',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string' },
+                    region: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     '/auth/telegram': {
       post: {
         summary: 'Authenticate with Telegram',
@@ -98,6 +167,240 @@ export const swaggerSpec = {
               },
             },
           },
+        },
+      },
+    },
+    '/users/stats': {
+      get: {
+        summary: 'Get user watch statistics',
+        tags: ['Users'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'User stats and recent history',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    stats: {
+                      type: 'object',
+                      properties: {
+                        total_episodes: { type: 'number' },
+                        total_series: { type: 'number' },
+                        total_favorites: { type: 'number' },
+                        plan: { type: 'string' },
+                      },
+                    },
+                    recent: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          series_id: { type: 'string' },
+                          episode: { type: 'number' },
+                          progress: { type: 'number' },
+                          watched_at: { type: 'string', format: 'date-time' },
+                          title: { type: 'string' },
+                          cover: { type: 'string' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/subscription': {
+      get: {
+        summary: 'Get current user subscription',
+        tags: ['Subscription'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Subscription info returned',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Subscription' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/subscription/upgrade': {
+      post: {
+        summary: 'Upgrade subscription plan',
+        tags: ['Subscription'],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  plan_type: { 
+                    type: 'string', 
+                    enum: ['weekly', 'monthly', 'yearly'],
+                    default: 'monthly'
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Upgrade successful',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    message: { type: 'string' },
+                    subscription: { $ref: '#/components/schemas/Subscription' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/payments': {
+      get: {
+        summary: 'Get user payment history',
+        tags: ['Payments'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'List of payments',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/Payment' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/payments/create': {
+      post: {
+        summary: 'Create a new payment record',
+        tags: ['Payments'],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  amount: { type: 'number' },
+                  currency: { type: 'string', default: 'USD' },
+                  provider: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Payment created',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Payment' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/watch/home': {
+      get: {
+        summary: 'Get homepage content',
+        tags: ['Watch'],
+        parameters: [
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
+        ],
+        responses: {
+          200: { description: 'Homepage data' },
+        },
+      },
+    },
+    '/watch/vip': {
+      get: {
+        summary: 'Get VIP content',
+        tags: ['Watch'],
+        parameters: [
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
+        ],
+        responses: {
+          200: { description: 'VIP content data' },
+        },
+      },
+    },
+    '/watch/search': {
+      get: {
+        summary: 'Search series',
+        tags: ['Watch'],
+        parameters: [
+          { name: 'q', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'page', in: 'query', schema: { type: 'number', default: 1 } },
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
+        ],
+        responses: {
+          200: { description: 'Search results' },
+        },
+      },
+    },
+    '/watch/detail/{id}': {
+      get: {
+        summary: 'Get series detail',
+        tags: ['Watch'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
+        ],
+        responses: {
+          200: { description: 'Series detail data' },
+        },
+      },
+    },
+    '/watch/episodes/{id}': {
+      get: {
+        summary: 'Get episode list',
+        tags: ['Watch'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
+        ],
+        responses: {
+          200: { description: 'Episode list' },
+        },
+      },
+    },
+    '/watch/stream/{id}/{episode}': {
+      get: {
+        summary: 'Get streaming link',
+        tags: ['Watch'],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'episode', in: 'path', required: true, schema: { type: 'number' } },
+          { name: 'lang', in: 'query', schema: { type: 'string', default: 'in' } }
+        ],
+        responses: {
+          200: { description: 'Streaming data' },
+          403: { description: 'VIP required' },
         },
       },
     },
@@ -162,6 +465,26 @@ export const swaggerSpec = {
         },
         responses: {
           200: { description: 'Progress saved' },
+        },
+      },
+    },
+    '/watch/history': {
+      get: {
+        summary: 'Get watch history',
+        tags: ['Watch'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Watch history list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/WatchHistory' },
+                },
+              },
+            },
+          },
         },
       },
     },

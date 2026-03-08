@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger';
 import { connectDB } from './db/mongo';
 import { handleTelegramUpdate } from './bot/bot';
 import { apiRateLimiter } from './middleware/ratelimit';
@@ -15,6 +17,9 @@ import configRoutes from './routes/config';
 const app = express();
 
 app.use(cors());
+
+// Swagger Documentation
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.post('/webhook', express.json(), async (req, res) => {
   try {
