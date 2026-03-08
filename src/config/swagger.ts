@@ -557,15 +557,7 @@ export const swaggerSpec = {
         },
       },
     },
-    '/favorites': {
-      get: {
-        summary: 'Get all favorites',
-        tags: ['Favorites'],
-        security: [{ bearerAuth: [] }],
-        responses: {
-          200: { description: 'List of favorites' },
-        },
-      },
+    '/favorites/toggle': {
       post: {
         summary: 'Toggle favorite',
         tags: ['Favorites'],
@@ -597,6 +589,16 @@ export const swaggerSpec = {
               }
             }
           },
+        },
+      },
+    },
+    '/favorites': {
+      get: {
+        summary: 'Get all favorites',
+        tags: ['Favorites'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'List of favorites' },
         },
       },
     },
