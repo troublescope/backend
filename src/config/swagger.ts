@@ -7,10 +7,6 @@ export const swaggerSpec = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
-      description: 'Local server',
-    },
-    {
       url: 'https://dramabackend.vercel.app',
       description: 'Production server (Vercel)',
     },
