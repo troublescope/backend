@@ -12,7 +12,7 @@ interface Config {
 }
 
 export const config: Config = {
-  port: process.env.PORT?.trim() || 3000,
+  port: process.env.PORT?.trim() || 3001,
   mongoUri: process.env.MONGODB_URI?.trim() || 'mongodb://localhost:27017/tmaback',
   botToken: process.env.BOT_TOKEN?.trim() || '',
   jwtSecret: process.env.JWT_SECRET?.trim() || 'fallback_secret',

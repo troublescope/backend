@@ -16,6 +16,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const user = await User.findById(decoded.user_id);
 
     if (!user) {
+      console.log('Auth failed: User not found in DB', decoded.user_id);
       throw new Error();
     }
 
