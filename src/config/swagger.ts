@@ -11,7 +11,7 @@ export const swaggerSpec = {
       description: 'Local server',
     },
     {
-      url: 'https://tmaback.vercel.app',
+      url: 'https://dramabackend.vercel.app',
       description: 'Production server (Vercel)',
     },
   ],
