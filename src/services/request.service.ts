@@ -55,9 +55,15 @@ export class RequestService {
   }
 
   private sign(str: string): string {
-    const signer = crypto.createSign('RSA-SHA256');
-    signer.update(str);
-    return signer.sign(this.getPrivateKey(), 'base64');
+    const signature = crypto.sign(
+      "sha256",
+      Buffer.from(str),
+      {
+        key: this.getPrivateKey(),
+        padding: crypto.constants.RSA_PKCS1_PADDING,
+      }
+    );
+    return signature.toString('base64');
   }
 
   private getRandomDevice(): DeviceInfo {
