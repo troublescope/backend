@@ -1,8 +1,5 @@
 import crypto from 'crypto';
-import zlib from 'zlib';
-import { promisify } from 'util';
-
-const gunzip = promisify(zlib.gunzip);
+import axios from 'axios';
 
 export interface TokenData {
   token: string;
@@ -93,8 +90,6 @@ export class RequestService {
       "current-language": lang,
       "device-id": deviceId,
       "android-id": androidId,
-      "X-Forwarded-For": spoffer,
-      "X-Real-IP": spoffer,
       "over-flow": "new-fly",
       "sn": signature,
       "pline": "ANDROID",
@@ -120,7 +115,6 @@ export class RequestService {
   }
 
   async generateToken(lang: string = 'in'): Promise<TokenData> {
-    // Promise lock to prevent multiple simultaneous boots
     const existingPromise = this.tokenPromise.get(lang);
     if (existingPromise) return existingPromise;
 
@@ -144,22 +138,13 @@ export class RequestService {
           await new Promise(r => setTimeout(r, i * 1000 + Math.random() * 200));
         }
         try {
-          const response = await fetch(url, { method: 'POST', headers, body });
+          const response = await axios.post(url, payload, { 
+            headers, 
+            timeout: this.timeout,
+            responseType: 'json'
+          });
           
-          let buffer = await response.arrayBuffer();
-          let text: string;
-          if (response.headers.get('content-encoding') === 'gzip') {
-            try {
-              const decompressed = await gunzip(Buffer.from(buffer));
-              text = decompressed.toString();
-            } catch (e) {
-              text = Buffer.from(buffer).toString();
-            }
-          } else {
-            text = Buffer.from(buffer).toString();
-          }
-
-          const result = JSON.parse(text) as any;
+          const result = response.data;
           const user = result?.data?.user;
           if (!user) throw new Error('Bootstrap failed');
 
@@ -206,8 +191,6 @@ export class RequestService {
     headers["userid"] = tokenData.uuid;
     
     const url = `${this.baseUrl}${endpoint}?timestamp=${timestamp}`;
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), this.timeout);
 
     let lastErr: any;
     for (let i = 0; i < 3; i++) {
@@ -215,38 +198,18 @@ export class RequestService {
         await new Promise(r => setTimeout(r, i * 1000 + Math.random() * 200));
       }
       try {
-        const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
-        clearTimeout(id);
-        
-        let buffer = await response.arrayBuffer();
-        let text: string;
-
-        if (response.headers.get('content-encoding') === 'gzip') {
-          try {
-            const decompressed = await gunzip(Buffer.from(buffer));
-            text = decompressed.toString();
-          } catch (e) {
-            text = Buffer.from(buffer).toString();
-          }
-        } else {
-          text = Buffer.from(buffer).toString();
-        }
-
-        try {
-          const parsed = JSON.parse(text);
-          if (response.status >= 500 && i < 2) throw new Error('Upstream 500');
-          return parsed;
-        } catch (e) {
-          if (i < 2) continue;
-          console.error(`JSON Parse Error from ${endpoint}. Status: ${response.status}. Body snippet: ${text.substring(0, 500)}`);
-          throw new Error(`Invalid JSON response from upstream (Status ${response.status})`);
-        }
+        const response = await axios.post(url, payload, { 
+          headers, 
+          timeout: this.timeout,
+          responseType: 'json'
+        });
+        return response.data;
       } catch (err: any) {
         lastErr = err;
+        if (err.response?.status >= 500 && i < 2) continue;
         if (i < 2) continue;
       }
     }
-    clearTimeout(id);
     throw lastErr;
   }
 }
