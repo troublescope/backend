@@ -1,8 +1,4 @@
 import crypto from 'crypto';
-import zlib from 'zlib';
-import { promisify } from 'util';
-
-const gunzip = promisify(zlib.gunzip);
 
 export interface TokenData {
   token: string;
@@ -73,7 +69,7 @@ export class RequestService {
     const localTimeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${tz}`;
 
     return {
-      "Accept-Encoding": "gzip",
+      "Accept-Encoding": "identity",
       "Connection": "Keep-Alive",
       "Content-Type": "application/json; charset=UTF-8",
       "version": "542",
@@ -133,19 +129,8 @@ export class RequestService {
       }
       try {
         const response = await fetch(url, { method: 'POST', headers, body });
-        
-        let buffer = await response.arrayBuffer();
-        let text: string;
-        if (response.headers.get('content-encoding') === 'gzip') {
-          try {
-            const decompressed = await gunzip(Buffer.from(buffer));
-            text = decompressed.toString();
-          } catch (e) {
-            text = Buffer.from(buffer).toString();
-          }
-        } else {
-          text = Buffer.from(buffer).toString();
-        }
+        const text = await response.text();
+
         const result = JSON.parse(text) as any;
         const user = result?.data?.user;
         if (!user) throw new Error('Bootstrap failed');
@@ -196,20 +181,8 @@ export class RequestService {
       try {
         const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
         clearTimeout(id);
-        
-        let buffer = await response.arrayBuffer();
-        let text: string;
+        const text = await response.text();
 
-        if (response.headers.get('content-encoding') === 'gzip') {
-          try {
-            const decompressed = await gunzip(Buffer.from(buffer));
-            text = decompressed.toString();
-          } catch (e) {
-            text = Buffer.from(buffer).toString();
-          }
-        } else {
-          text = Buffer.from(buffer).toString();
-        }
         try {
           const parsed = JSON.parse(text);
           if (response.status >= 500 && i < 2) throw new Error('Upstream 500');
