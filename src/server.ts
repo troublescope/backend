@@ -19,7 +19,14 @@ const app = express();
 app.use(cors());
 
 // Swagger Documentation
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+const swaggerOptions = {
+  customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.0.0/swagger-ui.css',
+  customJs: [
+    'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.0.0/swagger-ui-bundle.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.0.0/swagger-ui-standalone-preset.js'
+  ]
+};
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOptions));
 
 app.post('/webhook', express.json(), async (req, res) => {
   try {
