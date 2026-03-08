@@ -68,6 +68,10 @@ export class RequestService {
     const isIndo = lang === 'in';
     const tz = isIndo ? "+420" : "-300";
     
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const localTimeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${tz}`;
+
     return {
       "Accept-Encoding": "gzip",
       "Connection": "Keep-Alive",
@@ -104,6 +108,7 @@ export class RequestService {
       "ov": device.osVersion,
       "User-Agent": device.userAgent,
       "srn": "1080x2400",
+      "local-time": localTimeStr
     };
   }
 
@@ -121,38 +126,45 @@ export class RequestService {
     const headers = this.getBaseHeaders(lang, deviceId, androidId, timestamp, signature, spoffer);
     const url = `${this.baseUrl}/drama-box/ap001/bootstrap?timestamp=${timestamp}`;
 
-    try {
-      const response = await fetch(url, { method: 'POST', headers, body });
-      
-      let buffer = await response.arrayBuffer();
-      let text: string;
-      if (response.headers.get('content-encoding') === 'gzip') {
-        const decompressed = await gunzip(Buffer.from(buffer));
-        text = decompressed.toString();
-      } else {
-        text = Buffer.from(buffer).toString();
+    let lastErr: any;
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) {
+        await new Promise(r => setTimeout(r, i * 1000 + Math.random() * 200));
       }
+      try {
+        const response = await fetch(url, { method: 'POST', headers, body });
+        
+        let buffer = await response.arrayBuffer();
+        let text: string;
+        if (response.headers.get('content-encoding') === 'gzip') {
+          const decompressed = await gunzip(Buffer.from(buffer));
+          text = decompressed.toString();
+        } else {
+          text = Buffer.from(buffer).toString();
+        }
 
-      const result = JSON.parse(text) as any;
-      const user = result?.data?.user;
-      if (!user) throw new Error('Bootstrap failed');
+        const result = JSON.parse(text) as any;
+        const user = result?.data?.user;
+        if (!user) throw new Error('Bootstrap failed');
 
-      const tokenData: TokenData = {
-        token: user.token,
-        deviceId,
-        androidId,
-        spoffer,
-        uuid: user.uid.toString(),
-        timestamp: Date.now(),
-        expiry: Date.now() + 12 * 60 * 60 * 1000
-      };
+        const tokenData: TokenData = {
+          token: user.token,
+          deviceId,
+          androidId,
+          spoffer,
+          uuid: user.uid.toString(),
+          timestamp: Date.now(),
+          expiry: Date.now() + 12 * 60 * 60 * 1000
+        };
 
-      this.cache.set(`token_v2_${lang}`, tokenData, 3600 * 11);
-      return tokenData;
-    } catch (err: any) {
-      console.error('Token generation failed:', err.message);
-      throw err;
+        this.cache.set(`token_v2_${lang}`, tokenData, 3600 * 11);
+        return tokenData;
+      } catch (err: any) {
+        lastErr = err;
+        if (i < 2) continue;
+      }
     }
+    throw lastErr;
   }
 
   async request(endpoint: string, payload: any = {}, lang: string = 'in'): Promise<any> {
@@ -173,30 +185,41 @@ export class RequestService {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), this.timeout);
 
-    try {
-      const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
-      clearTimeout(id);
-      
-      let buffer = await response.arrayBuffer();
-      let text: string;
-
-      if (response.headers.get('content-encoding') === 'gzip') {
-        const decompressed = await gunzip(Buffer.from(buffer));
-        text = decompressed.toString();
-      } else {
-        text = Buffer.from(buffer).toString();
+    let lastErr: any;
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) {
+        await new Promise(r => setTimeout(r, i * 1000 + Math.random() * 200));
       }
-
       try {
-        return JSON.parse(text);
-      } catch (e) {
-        console.error(`JSON Parse Error from ${endpoint}. Status: ${response.status}. Body snippet: ${text.substring(0, 500)}`);
-        throw new Error(`Invalid JSON response from upstream (Status ${response.status})`);
+        const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
+        clearTimeout(id);
+        
+        let buffer = await response.arrayBuffer();
+        let text: string;
+
+        if (response.headers.get('content-encoding') === 'gzip') {
+          const decompressed = await gunzip(Buffer.from(buffer));
+          text = decompressed.toString();
+        } else {
+          text = Buffer.from(buffer).toString();
+        }
+
+        try {
+          const parsed = JSON.parse(text);
+          if (response.status >= 500 && i < 2) throw new Error('Upstream 500');
+          return parsed;
+        } catch (e) {
+          if (i < 2) continue;
+          console.error(`JSON Parse Error from ${endpoint}. Status: ${response.status}. Body snippet: ${text.substring(0, 500)}`);
+          throw new Error(`Invalid JSON response from upstream (Status ${response.status})`);
+        }
+      } catch (err: any) {
+        lastErr = err;
+        if (i < 2) continue;
       }
-    } catch (err: any) {
-      clearTimeout(id);
-      throw err;
     }
+    clearTimeout(id);
+    throw lastErr;
   }
 }
 
