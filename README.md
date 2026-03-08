@@ -18,7 +18,7 @@ Production-grade, modular backend for a Telegram Mini App streaming platform bui
 
 Interactive API documentation (Swagger UI) is available at:
 - **Local:** `http://localhost:3000/docs`
-- **Production:** `https://dramabackend.vercel.app/docs`
+- **Production:** `https://tmaback.vercel.app/docs`
 
 You can use this interface to:
 - **Explore** all available API endpoints.

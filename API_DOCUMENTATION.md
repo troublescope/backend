@@ -3,8 +3,8 @@
 This documentation covers the Dramabox integration, Telegram Bot, Authentication, User Management, and Payment systems.
 
 ## 🔗 Live URLs
-- **Production API:** `https://dramabackend.vercel.app`
-- **Interactive Docs (Swagger):** `https://dramabackend.vercel.app/docs/`
+- **Production API:** `https://tmaback.vercel.app`
+- **Interactive Docs (Swagger):** `https://tmaback.vercel.app/docs/`
 
 ---
 
