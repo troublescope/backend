@@ -3,7 +3,6 @@ import { config } from '../../config/env';
 
 export const startCommand = async (ctx: Context) => {
   const payload = ctx.match; 
-  console.log(`Start command called with payload: ${payload} by user ${ctx.from?.id}`);
 
   let targetUrl = config.miniAppUrl;
 

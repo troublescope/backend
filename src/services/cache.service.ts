@@ -4,6 +4,21 @@ class CacheService {
   private redisUrl = config.upstashRedisRestUrl;
   private redisToken = config.upstashRedisRestToken;
   private inMemoryMap = new Map<string, { value: any, expiry: number }>();
+  private lastCleanup = 0;
+
+  private cleanupExpiredEntries() {
+    const now = Date.now();
+    if (now - this.lastCleanup < 60_000) {
+      return;
+    }
+
+    this.lastCleanup = now;
+    for (const [key, value] of this.inMemoryMap.entries()) {
+      if (value.expiry <= now) {
+        this.inMemoryMap.delete(key);
+      }
+    }
+  }
 
   private async fetchRedis(command: string[]): Promise<any> {
     if (!this.redisUrl || !this.redisToken) return null;
@@ -23,6 +38,8 @@ class CacheService {
   }
 
   async set(key: string, value: any, ttlSeconds: number = 3600) {
+    this.cleanupExpiredEntries();
+
     // Try Redis
     if (this.redisUrl) {
       await this.fetchRedis(['SET', key, JSON.stringify(value), 'EX', String(ttlSeconds)]);
@@ -33,6 +50,8 @@ class CacheService {
   }
 
   async get<T>(key: string): Promise<T | null> {
+    this.cleanupExpiredEntries();
+
     // Check in-memory first (fastest)
     const local = this.inMemoryMap.get(key);
     if (local && Date.now() < local.expiry) return local.value as T;
@@ -57,6 +76,8 @@ class CacheService {
   }
 
   async incr(key: string, ttlSeconds: number = 86400): Promise<number> {
+    this.cleanupExpiredEntries();
+
     if (this.redisUrl) {
       const val = await this.fetchRedis(['INCR', key]);
       if (val === 1) await this.fetchRedis(['EXPIRE', key, String(ttlSeconds)]);

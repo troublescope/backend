@@ -5,6 +5,8 @@ import { swaggerSpec } from './config/swagger';
 import { connectDB } from './db/mongo';
 import { handleTelegramUpdate } from './bot/bot';
 import { apiRateLimiter } from './middleware/ratelimit';
+import { asyncHandler } from './lib/http';
+import { errorHandler, notFoundHandler } from './middleware/error-handler';
 
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
@@ -16,7 +18,11 @@ import configRoutes from './routes/config';
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.use(cors());
+app.use(express.json({ limit: '1mb' }));
+
+void connectDB();
 
 // Swagger Documentation
 const swaggerOptions = {
@@ -28,17 +34,16 @@ const swaggerOptions = {
 };
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOptions));
 
-app.post('/webhook', express.json(), async (req, res) => {
+app.post('/webhook', asyncHandler(async (req, res) => {
   try {
     await handleTelegramUpdate(req.body);
-    res.status(200).send('OK');
   } catch (err) {
     console.error('Telegram webhook error:', err);
-    res.status(200).send('OK');
   }
-});
 
-app.use(express.json());
+  res.status(200).send('OK');
+}));
+
 app.use(apiRateLimiter);
 
 app.use('/auth', authRoutes);
@@ -61,6 +66,7 @@ app.get('/', (req, res) => {
   res.json({ status: 'running' });
 });
 
-connectDB();
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;

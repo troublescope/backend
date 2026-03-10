@@ -1,13 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IFavorite extends Document {
-  user_id: mongoose.Types.ObjectId;
+  user_id: string;
   content_id: string;
   created_at: Date;
 }
 
 const FavoriteSchema: Schema = new Schema({
-  user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  user_id: { type: String, required: true, index: true },
   content_id: { type: String, required: true },
   created_at: { type: Date, default: Date.now }
 });

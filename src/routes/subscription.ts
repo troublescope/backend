@@ -2,54 +2,48 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import Subscription from '../models/Subscription';
 import User from '../models/User';
+import { asyncHandler, validate } from '../lib/http';
+import { subscriptionUpgradeSchema } from '../lib/schemas';
 
 const router = Router();
 
-router.get('/', authMiddleware, async (req, res) => {
-  try {
-    const user = (req as any).user;
-    const subscription = await Subscription.findOne({ user_id: user._id });
-    res.json(subscription);
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+router.get('/', authMiddleware, asyncHandler(async (req, res) => {
+  const user = (req as any).user;
+  const subscription = await Subscription.findOne({ user_id: user._id }).lean();
+  res.json(subscription);
+}));
 
-router.post('/upgrade', authMiddleware, async (req, res) => {
-  try {
-    const { plan_type } = req.body; // 'weekly', 'monthly', 'yearly'
-    const user = (req as any).user;
-    
-    let days = 30;
-    if (plan_type === 'weekly') days = 7;
-    if (plan_type === 'yearly') days = 365;
+router.post('/upgrade', authMiddleware, asyncHandler(async (req, res) => {
+  const { plan, plan_type } = validate(subscriptionUpgradeSchema, req.body);
+  const selectedPlan = plan_type || plan!;
+  const user = (req as any).user;
 
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + days);
+  let days = 30;
+  if (selectedPlan === 'weekly') days = 7;
+  if (selectedPlan === 'yearly') days = 365;
 
-    // Update User Plan
-    await User.findByIdAndUpdate(user._id, { plan: 'vip' });
-    
-    // Update or Create Subscription
-    const subscription = await Subscription.findOneAndUpdate(
-      { user_id: user._id },
-      { 
-        plan: 'vip',
-        status: 'active',
-        started_at: new Date(),
-        expires_at: expiryDate
-      },
-      { new: true, upsert: true }
-    );
-    
-    res.json({
-      success: true,
-      message: `Successfully upgraded to VIP for ${days} days`,
-      subscription
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+  const startedAt = new Date();
+  const expiryDate = new Date(startedAt);
+  expiryDate.setDate(expiryDate.getDate() + days);
+
+  await User.findByIdAndUpdate(user._id, { plan: 'vip' });
+
+  const subscription = await Subscription.findOneAndUpdate(
+    { user_id: user._id },
+    {
+      plan: 'vip',
+      status: 'active',
+      started_at: startedAt,
+      expires_at: expiryDate
+    },
+    { new: true, upsert: true }
+  ).lean();
+
+  res.json({
+    success: true,
+    message: `Successfully upgraded to VIP for ${days} days`,
+    subscription
+  });
+}));
 
 export default router;

@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IPayment extends Document {
-  user_id: mongoose.Types.ObjectId;
+  user_id: string;
   amount: number;
   currency: string;
   status: 'pending' | 'completed' | 'failed';
@@ -10,7 +10,7 @@ export interface IPayment extends Document {
 }
 
 const PaymentSchema: Schema = new Schema({
-  user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  user_id: { type: String, required: true, index: true },
   amount: { type: Number, required: true },
   currency: { type: String, required: true, default: 'USD' },
   status: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
